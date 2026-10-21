@@ -91,7 +91,23 @@ def theme_css(design: Design) -> str:
     out += ["", "  /* Fonts */"]
     out += [f'  {var}: "{family}", sans-serif;' for family, var in t["font_vars"].items()]
     out += [f"  --font-{role}: var({var});" for role, var in t["font_roles"].items()]
-    out += ["}", "", "/* Text styles, largest first */"]
+    baseline = t.get("baseline", {})
+    if "*" in baseline:
+        out += [
+            "",
+            "  /* Where the template's app puts text inside its line height, compared with browsers:",
+            "     deck.css moves every paragraph by --baseline-lh * 1lh + --baseline-em * 1em */",
+            f"  --baseline-lh: {baseline['*']['lh']:g};",
+            f"  --baseline-em: {baseline['*']['em']:g};",
+        ]
+    out += [
+        "}",
+        "",
+        "/* Printing (Save as PDF): one slide per page */",
+        f"@page {{ size: {t['slide']['width']}px {t['slide']['height']}px; margin: 0; }}",
+        "",
+        "/* Text styles, largest first */",
+    ]
 
     for s in t["text_styles"]:
         out += [
@@ -112,6 +128,8 @@ def theme_css(design: Design) -> str:
             out.append("  font-variant-caps: small-caps;")
         if s["color"]:
             out.append(f"  color: var({color_var[s['color']]});")
+        if s["family"] in baseline:
+            out += [f"  --baseline-lh: {baseline[s['family']]['lh']:g};", f"  --baseline-em: {baseline[s['family']]['em']:g};"]
         out += ["}", ""]
     return "\n".join(out)
 

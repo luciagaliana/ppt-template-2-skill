@@ -201,13 +201,13 @@ def walk(tree: ET.Element, transform: Transform) -> Iterator[tuple[str, ET.Eleme
             yield kind, el, None
 
 
-def _first(parent: ET.Element | None, tags: set[str]) -> ET.Element | None:
+def first_child(parent: ET.Element | None, tags: set[str]) -> ET.Element | None:
     if parent is None:
         return None
     return next((child for child in parent if local_name(child) in tags), None)
 
 
-def _level(containers: list[ET.Element], lvl: int, path: str, attr: str | None = None):
+def level_lookup(containers: list[ET.Element], lvl: int, path: str, attr: str | None = None):
     """First match of `path` under a:lvl{lvl}pPr in the containers, most specific first.
 
     With `attr`, returns the attribute value of the first match that has it.
@@ -281,6 +281,7 @@ class Collector:
         self.colors: dict[str, ColorUsage] = {}
         self.gradients: dict[str, GradientUsage] = {}
         self.styles: dict[TextStyle, StyleUsage] = {}
+        self.style_classes: dict[TextStyle, str] = {}  # exact style -> its CSS class, once design() ran
         self.fonts_used: Counter = Counter()  # (family, weight, italic) -> characters
         self.text_on: Counter = Counter()  # (surface, text color) -> characters
         self.largest_text: list[TextStyle] = []  # per slide, the style of its biggest text
@@ -301,12 +302,17 @@ class Collector:
 
     # Slides ---------------------------------------------------------------
 
-    def slide(self, index: int, part: str) -> None:
+    def context(self, index: int, part: str) -> tuple[SlideContext, str | None, str | None]:
+        """A fresh context for one slide, plus its layout and master part names."""
         layout = self.pkg.related(part, "slideLayout")
         master_part = self.pkg.related(layout, "slideMaster") if layout else None
         master = self.master(master_part)
         ctx = ColorContext(master.theme_colors, self.color_map([part, layout], master))
-        s = SlideContext(index, part, ctx, master)
+        return SlideContext(index, part, ctx, master), layout, master_part
+
+    def slide(self, index: int, part: str) -> None:
+        s, layout, master_part = self.context(index, part)
+        ctx = s.colors
         s.background = self.background(s, [part, layout, master_part])
         tree = self.pkg.xml(part).find("p:cSld/p:spTree", NS)
         if tree is not None:
@@ -389,7 +395,7 @@ class Collector:
             bg = self.pkg.xml(part).find("p:cSld/p:bg", NS)
             if bg is None:
                 continue
-            fill = _first(bg.find("p:bgPr", NS), FILL_TAGS)
+            fill = first_child(bg.find("p:bgPr", NS), FILL_TAGS)
             if fill is not None:
                 kind = local_name(fill)
                 if kind == "solidFill":
@@ -549,7 +555,7 @@ class Collector:
 
     def shape_fill(self, s: SlideContext, sp_pr, style, area: float) -> tuple[bool, str | None]:
         """Record the shape's fill. Returns (paints anything, opaque surface color or None)."""
-        fill = _first(sp_pr, FILL_TAGS)
+        fill = first_child(sp_pr, FILL_TAGS)
         if fill is not None:
             return self.fill(s, fill, area, "fill")
         ref = style.find("a:fillRef", NS) if style is not None else None
@@ -562,7 +568,7 @@ class Collector:
     def outline(self, s: SlideContext, sp_pr, style) -> bool:
         """Record the shape's outline color. Returns whether the outline is visible."""
         line = sp_pr.find("a:ln", NS) if sp_pr is not None else None
-        fill = _first(line, LINE_FILL_TAGS)
+        fill = first_child(line, LINE_FILL_TAGS)
         if fill is not None:
             return self.fill(s, fill, 0.0, "line")[0]
         ref = style.find("a:lnRef", NS) if style is not None else None
@@ -625,7 +631,7 @@ class Collector:
         chars = 0
         for cell in cells:
             surface = None
-            fill = _first(cell.find("a:tcPr", NS), FILL_TAGS)
+            fill = first_child(cell.find("a:tcPr", NS), FILL_TAGS)
             if fill is not None:
                 _, surface = self.fill(s, fill, self.area(box) / len(cells), "fill")
             body = cell.find("a:txBody", NS)
@@ -660,7 +666,7 @@ class Collector:
         for para in body.iterfind("a:p", NS):
             ppr = para.find("a:pPr", NS)
             lvl = min(max(int(num(ppr.get("lvl") if ppr is not None else None)) + 1, 1), 9)
-            align = (ppr.get("algn") if ppr is not None else None) or _level(containers, lvl, "", "algn") or "l"
+            align = (ppr.get("algn") if ppr is not None else None) or level_lookup(containers, lvl, "", "algn") or "l"
             for run in para:
                 if local_name(run) not in ("r", "fld"):
                     continue
@@ -676,11 +682,11 @@ class Collector:
         def attr(name: str) -> str | None:
             if rpr is not None and rpr.get(name) is not None:
                 return rpr.get(name)
-            return _level(containers, lvl, "a:defRPr", name)
+            return level_lookup(containers, lvl, "a:defRPr", name)
 
         def child(path: str) -> ET.Element | None:
             el = rpr.find(path, NS) if rpr is not None else None
-            return el if el is not None else _level(containers, lvl, f"a:defRPr/{path}")
+            return el if el is not None else level_lookup(containers, lvl, f"a:defRPr/{path}")
 
         size_pt = num(attr("sz"), 1800) / 100
         typeface = self.typeface(_typeface(child("a:latin"), "+mn-lt"), s.master)
@@ -694,9 +700,10 @@ class Collector:
             family=family,
             weight=weight,
             italic=italic,
-            size_px=round(size_pt * 96 / 72, 1),
-            line_height=round(self.line_height(ppr, lvl, containers, size_pt), 2),
-            letter_spacing_em=round(spacing_pt / size_pt, 3) + 0.0 if size_pt else 0.0,
+            # Precise values: a 0.1% wider line can already break one word earlier.
+            size_px=round(size_pt * 96 / 72, 2),
+            line_height=round(self.line_height(ppr, lvl, containers, size_pt), 3),
+            letter_spacing_em=round(spacing_pt / size_pt, 4) + 0.0 if size_pt else 0.0,
             caps=attr("cap") or "none",
         )
         return style, color
@@ -725,7 +732,7 @@ class Collector:
     def line_height(self, ppr, lvl: int, containers, size_pt: float) -> float:
         spacing = ppr.find("a:lnSpc", NS) if ppr is not None else None
         if spacing is None:
-            spacing = _level(containers, lvl, "a:lnSpc")
+            spacing = level_lookup(containers, lvl, "a:lnSpc")
         if spacing is not None:
             points = spacing.find("a:spcPts", NS)
             if points is not None and size_pt:
@@ -885,6 +892,8 @@ class Collector:
             main = c.main.style
             sizes = [u.style.size_px for u in c.members]
             colors, surfaces, align = c.total("colors"), c.total("surfaces"), c.total("align")
+            for u in c.members:
+                self.style_classes[u.style] = f"text-{names[id(c)]}"
             styles.append({
                 "class": f"text-{names[id(c)]}",
                 "family": main.family,
@@ -1048,12 +1057,15 @@ def _style_names(clusters: list[TypeStyle], title_votes: Counter) -> dict[int, s
         names[id(group[0])] = level
         for c in group[1:]:
             weight = c.main.style.weight
-            name = f"{level}-{WEIGHT_NAMES.get(weight, weight)}"
-            if weight == group[0].main.style.weight or name in taken:
-                number = 2
-                while f"{level}-{number}" in taken:
-                    number += 1
-                name = f"{level}-{number}"
+            if weight != group[0].main.style.weight:
+                name = f"{level}-{WEIGHT_NAMES.get(weight, weight)}"
+            else:  # same weight, another size: larger or smaller than the level's main style
+                name = f"{level}-{'lg' if c.size_px > group[0].size_px else 'sm'}"
+            number = 2
+            stem = name
+            while name in taken:
+                name = f"{stem}-{number}"
+                number += 1
             taken.add(name)
             names[id(c)] = name
     return names
@@ -1061,3 +1073,9 @@ def _style_names(clusters: list[TypeStyle], title_votes: Counter) -> dict[int, s
 
 def extract_design(path: Path) -> Design:
     return Collector(path).run()
+
+
+def load_template(path: Path) -> tuple[Collector, Design]:
+    """The design system plus the collector that read it, which the slide converter reuses."""
+    collector = Collector(path)
+    return collector, collector.run()

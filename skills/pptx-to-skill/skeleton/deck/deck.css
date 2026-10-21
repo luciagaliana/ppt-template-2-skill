@@ -1,0 +1,46 @@
+/* Slide deck runtime: every <section class="slide"> is one slide of --slide-width x --slide-height
+   px (set in theme.css), scaled to fit the window. Elements inside a slide are absolutely
+   positioned in slide px. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: #161616; overflow: hidden; }
+
+.deck { position: fixed; inset: 0; }
+.slide {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--slide-width);
+  height: var(--slide-height);
+  overflow: hidden;
+  background: #FFFFFF;
+  transform: translate(-50%, -50%) scale(var(--deck-scale, 1));
+  visibility: hidden;
+  /* Exact glyph widths, so lines break where they broke in the template */
+  text-rendering: geometricPrecision;
+}
+.slide.active { visibility: visible; }
+
+.slide .el, .slide .group, .slide .text { position: absolute; }
+.slide img.el { display: block; }
+.slide svg.el { overflow: visible; }
+.slide .text { display: flex; flex-direction: column; }
+.slide .text p {
+  margin: 0;
+  /* Place text in its line like the template's app did (measured when the skill was built) */
+  position: relative;
+  top: calc(var(--baseline-lh, 0) * 1lh + var(--baseline-em, 0) * 1em);
+}
+.slide .text .bullet { display: inline-block; text-indent: 0; }
+
+/* ?static: every slide at full size, one under the other (screenshots, review) */
+body.static { overflow: visible; background: none; }
+body.static .deck { position: static; }
+body.static .slide { position: relative; left: auto; top: auto; transform: none; visibility: visible; }
+
+@media print {
+  html, body { height: auto; overflow: visible; background: none; }
+  .deck { position: static; }
+  .slide { position: relative; left: auto; top: auto; transform: none; visibility: visible; break-after: page; }
+}
