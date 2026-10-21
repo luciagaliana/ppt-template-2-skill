@@ -371,24 +371,10 @@ class SlideConverter:
 
     def placeholder_xfrm(self, el: ET.Element) -> ET.Element | None:
         """Position of a slide placeholder without its own: the matching layout or master placeholder."""
-        ph = el.find("*/p:nvPr/p:ph", NS)
-        if ph is None:
-            return None
-        idx, ph_type = ph.get("idx"), ph.get("type", "obj")
-        for part in (self.layout_part, self.master_part):
-            tree = self.pkg.xml(part).find("p:cSld/p:spTree", NS) if part else None
-            for candidate in tree.iter() if tree is not None else ():
-                if local_name(candidate) != "sp":
-                    continue
-                other = candidate.find("p:nvSpPr/p:nvPr/p:ph", NS)
-                if other is None:
-                    continue
-                same_idx = idx is not None and other.get("idx") == idx
-                other_type = other.get("type", "obj")
-                same_type = other_type == ph_type or {other_type, ph_type} == {"title", "ctrTitle"}
-                xfrm = candidate.find("p:spPr/a:xfrm", NS)
-                if xfrm is not None and (same_idx or (idx is None and same_type) or (part == self.master_part and same_type)):
-                    return xfrm
+        for _, source in self.c.placeholder_sources(el, self.layout_part, self.master_part):
+            xfrm = source.find("p:spPr/a:xfrm", NS)
+            if xfrm is not None:
+                return xfrm
         return None
 
     def shape(self, el: ET.Element, frame: Frame, part: str) -> str:
@@ -737,7 +723,7 @@ class SlideConverter:
         autofit = pr.find("a:normAutofit", NS) if pr is not None else None
         scale = percent(autofit.get("fontScale"), 1.0) if autofit is not None else 1.0
 
-        containers = self.c.text_containers(el, self.s.master)
+        containers = self.c.text_containers(el, self.s)
         font_ref = style.find("a:fontRef", NS) if style is not None else None
         shape_color = self.s.colors.fill_color(font_ref)
         numbering: Counter = Counter()
@@ -854,6 +840,8 @@ class SlideConverter:
                 rel = self.pkg.rels(self.part).get(link.get(q("r:id"), ""))
                 if rel is not None and rel.external:
                     parts[-1] = f'<a href="{html.escape(rel.target)}">{parts[-1]}</a>'
+        if text_runs and runs[-1][0] == "br":
+            parts.append("<br>")  # PowerPoint gives a final line break an empty line; HTML needs a second <br>
         content = "".join(parts) if text_runs else "<br>"
         attrs = (f' class="{cls}"' if cls else "") + (f' style="{";".join(css)}"' if css else "")
         chars = sum(len(r[1].strip()) for r in text_runs)

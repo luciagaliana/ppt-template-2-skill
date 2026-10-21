@@ -129,6 +129,8 @@ class SlideContext:
     part: str
     colors: ColorContext
     master: Master
+    layout_part: str | None = None
+    master_part: str | None = None
     background: str | None = None  # "#RRGGBB", "image", "gradient", "pattern" or None
     surfaces: list[tuple[tuple, str]] = field(default_factory=list)  # (box, "#RRGGBB" | "image"), in paint order
     edge_boxes: list[tuple] = field(default_factory=list)  # text boxes and lines, which sit on the margins
@@ -308,7 +310,7 @@ class Collector:
         master_part = self.pkg.related(layout, "slideMaster") if layout else None
         master = self.master(master_part)
         ctx = ColorContext(master.theme_colors, self.color_map([part, layout], master))
-        return SlideContext(index, part, ctx, master), layout, master_part
+        return SlideContext(index, part, ctx, master, layout, master_part), layout, master_part
 
     def slide(self, index: int, part: str) -> None:
         s, layout, master_part = self.context(index, part)
@@ -455,7 +457,7 @@ class Collector:
         if body is not None:
             font_ref = style.find("a:fontRef", NS) if style is not None else None
             under = surface or self.surface_at(s, box)
-            chars = self.text(s, body, self.text_containers(el, s.master), s.colors.fill_color(font_ref), under)
+            chars = self.text(s, body, self.text_containers(el, s), s.colors.fill_color(font_ref), under)
             self.body_features(s, body)
         if surface and box is not None:
             s.surfaces.append((box, surface))
@@ -643,22 +645,52 @@ class Collector:
 
     # Text -----------------------------------------------------------------
 
-    def text_containers(self, el: ET.Element, master: Master) -> list[ET.Element]:
+    def placeholder_sources(self, el: ET.Element, layout_part: str | None, master_part: str | None) -> list[tuple[str, ET.Element]]:
+        """(part, shape) of the layout and master placeholders a slide placeholder inherits from, layout first.
+
+        On the layout, a placeholder with an idx matches the same idx; on the master, the same type.
+        """
+        ph = el.find("*/p:nvPr/p:ph", NS)
+        if ph is None:
+            return []
+        idx, ph_type = ph.get("idx"), ph.get("type", "obj")
+        out = []
+        for part in (layout_part, master_part):
+            tree = self.pkg.xml(part).find("p:cSld/p:spTree", NS) if part else None
+            for candidate in tree.iter() if tree is not None else ():
+                if local_name(candidate) != "sp":
+                    continue
+                other = candidate.find("p:nvSpPr/p:nvPr/p:ph", NS)
+                if other is None:
+                    continue
+                same_idx = idx is not None and other.get("idx") == idx
+                other_type = other.get("type", "obj")
+                same_type = other_type == ph_type or {other_type, ph_type} == TITLE_PLACEHOLDERS
+                if same_idx or (idx is None and same_type) or (part == master_part and same_type):
+                    out.append((part, candidate))
+        return out
+
+    def text_containers(self, el: ET.Element, s: SlideContext) -> list[ET.Element]:
         """Where a shape's paragraphs look up their level styles, most specific first.
 
-        Placeholders also inherit from the matching layout and master placeholders;
-        that chain is not followed here.
+        Placeholders inherit from the matching layout placeholder, then the master one, before
+        the master's text styles: Google Slides puts a template's real text styles there.
         """
         own = el.find("p:txBody/a:lstStyle", NS)
+        inherited, seen = [], set()
+        for part, source in self.placeholder_sources(el, s.layout_part, s.master_part):
+            if part not in seen:  # the first match of each part is the one PowerPoint uses
+                seen.add(part)
+                inherited.append(source.find("p:txBody/a:lstStyle", NS))
         ph = el.find("p:nvSpPr/p:nvPr/p:ph", NS)
         ph_type = None if ph is None else ph.get("type", "obj")
         if ph_type in TITLE_PLACEHOLDERS:
-            shared = master.title_style
+            shared = s.master.title_style
         elif ph_type is None or ph_type in OTHER_PLACEHOLDERS:
-            shared = master.other_style
+            shared = s.master.other_style
         else:
-            shared = master.body_style
-        return [c for c in (own, shared, self.default_style) if c is not None]
+            shared = s.master.body_style
+        return [c for c in (own, *inherited, shared, self.default_style) if c is not None]
 
     def text(self, s: SlideContext, body: ET.Element, containers, shape_color, surface: str | None) -> int:
         """Record every run of a text body. Returns its number of characters."""
