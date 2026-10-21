@@ -1,0 +1,15 @@
+[project]
+name = "ppt-template-2-skill"
+version = "0.1.0"
+description = "Turn a PowerPoint or Canva template into an Agent Skill that builds HTML presentations with the same design."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fonttools>=4.47",
+    "pillow>=10.0",
+    "playwright>=1.64.0",
+    "pypdfium2>=4.30",
+]
+
+[tool.uv]
+package = false

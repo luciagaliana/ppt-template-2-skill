@@ -1,0 +1,10 @@
+# Templates and everything generated from them. Canva and internet templates
+# are usually licensed: keep them out of the repository.
+inputs/
+build/
+output/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
