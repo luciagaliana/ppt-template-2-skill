@@ -4,7 +4,7 @@
 Writes theme.css, theme-preview.html, design-tokens.json, inventory.json and the
 embedded fonts into the output folder.
 
-Usage: python3 extract.py plantilla.pptx -o output/plantilla
+Usage: python3 extract.py template.pptx -o output/template
 """
 
 from __future__ import annotations

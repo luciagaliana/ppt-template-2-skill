@@ -1,66 +1,66 @@
 # ppt-template-2-skill
 
-Convierte una plantilla de PowerPoint (o de Canva o Google Slides, exportada a `.pptx`) en una **skill** para que Claude Code o Copilot creen presentaciones **HTML** con el mismo diseño: colores, tipografías, formas, imágenes y diagramas.
+Turn a PowerPoint template (or a Canva or Google Slides one, exported to `.pptx`) into a **skill** so Claude Code or Copilot can build **HTML** presentations with the same design: colors, typography, shapes, images and diagrams.
 
-## Cómo funciona
+## How it works
 
 ```
-plantilla.pptx (+ plantilla.pdf de referencia)
+template.pptx (+ template.pdf as the visual reference)
       │
-      ▼  skills/pptx-to-skill: la skill que fabrica skills (este repo)
-      │    1. Los scripts leen el XML del pptx: colores, fuentes, posiciones, formas, imágenes
-      │    2. Convierten cada diapositiva a HTML + SVG
-      │    3. Comparan capturas del HTML con el PDF y corrigen las diferencias
-      │    4. Claude escribe el SKILL.md de la skill nueva
+      ▼  skills/pptx-to-skill: the skill that builds skills (this repo)
+      │    1. Scripts read the pptx XML: colors, fonts, positions, shapes, images
+      │    2. They convert every slide to HTML + SVG
+      │    3. They compare screenshots of the HTML with the PDF and fix the differences
+      │    4. Claude writes the SKILL.md of the new skill
       ▼
-output/mi-plantilla/: la skill generada
+output/my-template/: the generated skill
       SKILL.md, theme.css, layouts/, assets/, previews/
       │
       ▼
-«Hazme una presentación sobre X con mi-plantilla» → presentacion.html
+"Make me a presentation about X with my-template" → presentation.html
 ```
 
-## Estado
+## Status
 
-| Fase | Qué hace | Estado |
+| Phase | What it does | Status |
 |---|---|---|
-| 1 | Sistema de diseño: colores, degradados, fuentes, estilos de texto y márgenes → `theme.css` | Hecha |
-| 2 | Diapositivas → HTML: textos, imágenes, formas | Pendiente |
-| 3 | Generar la skill y compararla con el PDF | Pendiente |
-| 4 | Formas predefinidas, gráficos, SmartArt, efectos | Pendiente |
+| 1 | Design system: colors, gradients, fonts, text styles and margins → `theme.css` | Done |
+| 2 | Slides → HTML: text, images, shapes | To do |
+| 3 | Generate the skill and compare it with the PDF | To do |
+| 4 | Preset shapes, charts, SmartArt, effects | To do |
 
-## Uso
+## Usage
 
-Requisitos: Python 3.10+ y [uv](https://docs.astral.sh/uv/).
+Requirements: Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 .venv/bin/playwright install chromium
 
-# Sistema de diseño de la plantilla
-.venv/bin/python skills/pptx-to-skill/scripts/extract.py inputs/plantilla/plantilla.pptx -o output/plantilla
+# The template's design system
+.venv/bin/python skills/pptx-to-skill/scripts/extract.py inputs/template/template.pptx -o output/template
 
-# Imágenes de referencia, una por diapositiva
-.venv/bin/python skills/pptx-to-skill/scripts/pdf_to_png.py inputs/plantilla/plantilla.pdf -o build/plantilla/reference
+# Reference images, one per slide
+.venv/bin/python skills/pptx-to-skill/scripts/pdf_to_png.py inputs/template/template.pdf -o build/template/reference
 ```
 
-Abre `output/plantilla/theme-preview.html` en el navegador para ver la paleta, las superficies, los estilos de texto y las fuentes.
+Open `output/template/theme-preview.html` in a browser to see the palette, surfaces, text styles and fonts.
 
-## Estructura
+## Layout
 
 ```
-skills/pptx-to-skill/        la skill fábrica
-  SKILL.md                   instrucciones para Claude
+skills/pptx-to-skill/        the skill that builds skills
+  SKILL.md                   instructions for Claude
   requirements.txt
   scripts/
-    extract.py               pptx → theme.css, design-tokens.json, inventory.json, fuentes
-    pdf_to_png.py            PDF → una imagen por diapositiva
-    render.py                HTML → captura PNG (Chromium sin ventana)
-    crop.py                  recorta una zona de una imagen para verla en detalle
-    pptx2skill/              código compartido: lectura del pptx, colores, fuentes, diseño
-inputs/   build/   output/   plantillas y resultados (no se suben a git)
+    extract.py               pptx → theme.css, design-tokens.json, inventory.json, fonts
+    pdf_to_png.py            PDF → one image per slide
+    render.py                HTML → PNG screenshot (headless Chromium)
+    crop.py                  crops a region of an image to inspect details
+    pptx2skill/              shared code: pptx reading, colors, fonts, design
+inputs/   build/   output/   templates and results (not committed)
 ```
 
-## Plantillas y licencias
+## Templates and licenses
 
-`inputs/`, `build/` y `output/` están en `.gitignore`: las plantillas de Canva o de internet suelen tener licencia y no se pueden redistribuir. Sube solo plantillas tuyas o con licencia libre.
+`inputs/`, `build/` and `output/` are in `.gitignore`: Canva and internet templates are usually licensed and cannot be redistributed. Only commit templates you own or that have an open license.

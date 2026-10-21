@@ -4,7 +4,7 @@
 Export the PDF from the app the template was made in (Canva, PowerPoint, Google Slides):
 it shows exactly what the HTML has to look like.
 
-Usage: python3 pdf_to_png.py plantilla.pdf -o build/plantilla/reference [--width 1920]
+Usage: python3 pdf_to_png.py template.pdf -o build/template/reference [--width 1920]
 """
 
 from __future__ import annotations

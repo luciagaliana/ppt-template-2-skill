@@ -1,56 +1,56 @@
 ---
 name: pptx-to-skill
-description: Convierte una plantilla de PowerPoint (.pptx, también exportada desde Canva o Google Slides) en una skill para crear presentaciones HTML con el mismo diseño. Úsala cuando el usuario quiera convertir una plantilla en una skill o extraer su sistema de diseño (colores, fuentes, estilos de texto).
+description: Turns a PowerPoint template (.pptx, also exported from Canva or Google Slides) into a skill that builds HTML presentations with the same design. Use it when the user wants to turn a template into a skill or extract its design system (colors, fonts, text styles).
 ---
 
 # pptx-to-skill
 
-> En construcción: hoy funciona el paso 1 (sistema de diseño).
+> Work in progress: step 1 (design system) works today.
 
-## Entradas
+## Inputs
 
-- `plantilla.pptx`
-- `plantilla.pdf`: la misma plantilla exportada a PDF desde la aplicación original (Canva, PowerPoint, Google Slides). Es la referencia visual de cómo debe verse el HTML.
+- `template.pptx`
+- `template.pdf`: the same template exported to PDF from the app it was made in (Canva, PowerPoint, Google Slides). It is the visual reference for what the HTML must look like.
 
-## Preparación
+## Setup
 
-Los scripts están en `scripts/` y necesitan las dependencias de `requirements.txt`:
+The scripts live in `scripts/` and need the packages in `requirements.txt`:
 
 ```bash
 pip install -r requirements.txt
 playwright install chromium
 ```
 
-Si los archivos vienen de internet, ejecuta Python con `-I` y deja la plantilla en una carpeta propia, sin scripts.
+If the files come from the internet, run Python with `-I` and keep the template in a folder of its own, with no scripts in it.
 
-## Paso 1: sistema de diseño
+## Step 1: design system
 
 ```bash
-python3 scripts/extract.py plantilla.pptx -o <skill>
-python3 scripts/pdf_to_png.py plantilla.pdf -o <build>/reference
+python3 scripts/extract.py template.pptx -o <skill>
+python3 scripts/pdf_to_png.py template.pdf -o <build>/reference
 python3 scripts/render.py <skill>/theme-preview.html -o <build>/theme-preview.png --width 1480 --full-page
 ```
 
-`extract.py` escribe en `<skill>`:
+`extract.py` writes into `<skill>`:
 
-| Archivo | Qué contiene |
+| File | Contents |
 |---|---|
-| `theme.css` | `@font-face`, paleta, roles de color, degradados, márgenes y una clase por estilo de texto |
-| `design-tokens.json` | Lo mismo en JSON, con cuántas veces y en qué diapositivas se usa cada valor |
-| `inventory.json` | Qué hay en cada diapositiva: textos, imágenes, formas, efectos |
-| `assets/fonts/` | Las fuentes que la plantilla trae incrustadas |
-| `theme-preview.html` | Página para revisar el sistema de diseño de un vistazo |
+| `theme.css` | `@font-face` rules, palette, color roles, gradients, margins and one class per text style |
+| `design-tokens.json` | The same in JSON, with how often and on which slides each value is used |
+| `inventory.json` | What each slide contains: text, images, shapes, effects |
+| `assets/fonts/` | The fonts embedded in the template |
+| `theme-preview.html` | A page to review the design system at a glance |
 
-Cómo revisar el resultado:
+How to review the result:
 
-1. Lee el resumen que imprime `extract.py`, sobre todo los avisos (`Warnings`): fuentes que no vienen en el pptx o a las que les faltan letras.
-2. Mira la captura de `theme-preview.html` junto a las imágenes de `reference/`. Comprueba que colores, fuentes y estilos de texto coinciden con la plantilla.
-3. Los nombres de los estilos (`text-title`, `text-h2`, `text-body`…) salen de una heurística: el estilo con más texto es `body` y el texto más grande en más diapositivas es `title`. Si alguno no encaja con su uso real, anótalo para el `SKILL.md` de la skill generada.
+1. Read the summary `extract.py` prints, above all the `Warnings`: fonts that are not embedded in the pptx, or that lack characters.
+2. Look at the `theme-preview.html` screenshot next to the images in `reference/`. Check that colors, fonts and text styles match the template.
+3. Text style names (`text-title`, `text-h2`, `text-body`...) come from a heuristic: the style with the most text is `body`, and the biggest text on the most slides is `title`. If a name does not match how the style is really used, note it for the generated skill's `SKILL.md`.
 
-Por qué el sistema de diseño sale de las diapositivas y no del tema: Canva y muchas plantillas de internet dejan el tema de Office por defecto y dan formato a cada forma a mano. `extract.py` indica si el tema se usa (`theme.used_by_slides`).
+Why the design system comes from the slides and not from the theme: Canva and many internet templates leave the Office theme at its defaults and format every shape by hand. `extract.py` reports whether the theme is used (`theme.used_by_slides`).
 
-## Próximos pasos (pendientes)
+## Next steps (to do)
 
-2. Convertir cada diapositiva a HTML + SVG (`layouts/`).
-3. Comparar las capturas del HTML con `reference/` y corregir las diferencias.
-4. Escribir el `SKILL.md` de la skill generada: qué layout usar para qué y las reglas de estilo.
+2. Convert every slide to HTML + SVG (`layouts/`).
+3. Compare screenshots of the HTML with `reference/` and fix the differences.
+4. Write the generated skill's `SKILL.md`: which layout to use for what, and the style rules.

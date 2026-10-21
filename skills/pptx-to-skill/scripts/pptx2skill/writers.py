@@ -10,12 +10,6 @@ from .colors import contrast
 from .design import Design
 from .fonts import font_file_name
 
-# Labels of the preview page, which is in Spanish.
-ROLE_LABELS = {
-    "background": "fondo", "text": "texto", "fill": "relleno",
-    "line": "línea", "icon": "icono", "gradient": "degradado",
-}
-
 
 def write_all(design: Design, out: Path) -> list[Path]:
     """Write every output into `out`; returns the written paths."""
@@ -153,7 +147,7 @@ def preview_html(design: Design) -> str:
         <figcaption>
           <b>{c['hex']}</b>
           <code>{'<br>'.join([c['var'], *aliases.get(c['var'], [])])}</code>
-          <span>{e(', '.join(ROLE_LABELS.get(r, r) for r in c['roles']))} · {len(c['slides'])} de {count} diapositivas</span>
+          <span>{e(', '.join(c['roles']))} · {len(c['slides'])} of {count} slides</span>
         </figcaption>
       </figure>"""
         for c in t["colors"]
@@ -163,9 +157,9 @@ def preview_html(design: Design) -> str:
       <figure class="swatch">
         <div class="chip" style="background: var({g['var']})"></div>
         <figcaption>
-          <b>Degradado</b>
+          <b>Gradient</b>
           <code>{g['var']}</code>
-          <span>{_plural(g['count'], 'forma', 'formas')} · {len(g['slides'])} de {count} diapositivas</span>
+          <span>{_plural(g['count'], 'shape', 'shapes')} · {len(g['slides'])} of {count} slides</span>
         </figcaption>
       </figure>"""
         for g in t["gradients"]
@@ -175,7 +169,7 @@ def preview_html(design: Design) -> str:
         f"""
       <div class="surface" style="background: {s['background']}; color: {s['text']}">
         <b>Aa</b>
-        <span>Texto {s['text']}<br>sobre {s['background']}</span>
+        <span>Text {s['text']}<br>on {s['background']}</span>
       </div>"""
         for s in t["surfaces"][:4]
     )
@@ -184,9 +178,9 @@ def preview_html(design: Design) -> str:
         f"""
       <div class="specimen-row">
         <p class="meta"><b>.{s['class']}</b> · {e(s['family'])} {s['weight']} · {_n(s['size_px'])} px
-          {f"(en la plantilla de {_n(s['size_range_px'][0])} a {_n(s['size_range_px'][1])} px)" if s['size_range_px'][0] != s['size_range_px'][1] else ''} ·
-          interlineado {_n(s['line_height'])} · espaciado {_n(s['letter_spacing_em'])} em ·
-          {_plural(s['runs'], 'uso', 'usos')} en {_plural(len(s['slides']), 'diapositiva', 'diapositivas')}</p>
+          {f"({_n(s['size_range_px'][0])} to {_n(s['size_range_px'][1])} px in the template)" if s['size_range_px'][0] != s['size_range_px'][1] else ''} ·
+          line height {_n(s['line_height'])} · letter spacing {_n(s['letter_spacing_em'])} em ·
+          {_plural(s['runs'], 'use', 'uses')} on {_plural(len(s['slides']), 'slide', 'slides')}</p>
         <div class="specimen" style="background: {_specimen_background(s, t['surfaces'])}">
           <p class="sample {s['class']}">{e(s['sample'])}</p>
         </div>
@@ -197,16 +191,16 @@ def preview_html(design: Design) -> str:
     rows = []
     for f in t["fonts"]:
         if f["file"] is None:
-            status = '<span class="warn">No viene en el pptx</span>'
+            status = '<span class="warn">Not embedded in the pptx</span>'
         elif f["missing_chars"]:
-            status = f'<span class="warn">Le faltan: {e(" ".join(f["missing_chars"]))}</span>'
+            status = f'<span class="warn">Missing: {e(" ".join(f["missing_chars"]))}</span>'
         else:
-            status = '<span class="ok">Completa</span>'
+            status = '<span class="ok">Complete</span>'
         face_style = e(f'font-family: "{f["family"]}"; font-weight: {f["weight"]}; font-style: {"italic" if f["italic"] else "normal"}')
         rows.append(f"""
         <tr>
-          <td style="{face_style}">{e(f['family'])} · Áá Ññ ¿?</td>
-          <td>{f['weight']}{' itálica' if f['italic'] else ''}</td>
+          <td style="{face_style}">{e(f['family'])} · Aa Áá Ññ 0123</td>
+          <td>{f['weight']}{' italic' if f['italic'] else ''}</td>
           <td><code>{e(f['file'] or '—')}</code></td>
           <td>{f['chars']}</td>
           <td>{status}</td>
@@ -214,19 +208,18 @@ def preview_html(design: Design) -> str:
 
     theme = t["theme"]
     theme_note = (
-        "las diapositivas lo usan" if theme["used_by_slides"]
-        else "ninguna diapositiva lo usa, así que todo lo de esta página sale de las diapositivas"
+        "the slides use it" if theme["used_by_slides"]
+        else "no slide uses it, so everything on this page comes from the slides themselves"
     )
-    margin_labels = {"margin-left": "margen izquierdo", "margin-right": "margen derecho", "margin-top": "margen superior"}
-    spacing = " · ".join(f"{margin_labels.get(name, name)}: {value} px" for name, value in t["spacing"].items())
+    spacing = " · ".join(f"{name.replace('-', ' ')}: {value} px" for name, value in t["spacing"].items())
     heading_weight = t["text_styles"][0]["weight"] if t["text_styles"] else 700
 
     return f"""<!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sistema de diseño · {e(t['source'])}</title>
+<title>Design system · {e(t['source'])}</title>
 <link rel="stylesheet" href="theme.css">
 <style>
   body {{ margin: 0; background: #F4F4F2; color: #1F1F1F; font: 15px/1.5 system-ui, "Segoe UI", sans-serif; }}
@@ -258,23 +251,23 @@ def preview_html(design: Design) -> str:
 <main>
   <header>
     <h1>{e(t['source'])}</h1>
-    <p class="meta">{count} diapositivas · {t['slide']['width']} × {t['slide']['height']} px{f' · {spacing}' if spacing else ''}<br>
-      Tema del pptx «{e(theme['name'])}»: {theme_note}.</p>
+    <p class="meta">{count} slides · {t['slide']['width']} × {t['slide']['height']} px{f' · {spacing}' if spacing else ''}<br>
+      pptx theme "{e(theme['name'])}": {theme_note}.</p>
   </header>
 
-  <h2>Colores y degradados</h2>
+  <h2>Colors and gradients</h2>
   <div class="swatches">{swatches}
   </div>
 
-  <h2>Superficies: fondo y color de texto que lleva encima</h2>
+  <h2>Surfaces: background and the text color used on it</h2>
   <div class="surfaces">{surfaces}
   </div>
 
-  <h2>Estilos de texto</h2>{specimens}
+  <h2>Text styles</h2>{specimens}
 
-  <h2>Fuentes</h2>
+  <h2>Fonts</h2>
   <table>
-    <tr><th>Familia</th><th>Peso</th><th>Archivo</th><th>Caracteres en la plantilla</th><th>Para texto nuevo</th></tr>{''.join(rows)}
+    <tr><th>Family</th><th>Weight</th><th>File</th><th>Characters in the template</th><th>For new text</th></tr>{''.join(rows)}
   </table>
 </main>
 </body>
